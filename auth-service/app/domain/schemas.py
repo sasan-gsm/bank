@@ -5,7 +5,7 @@ Uses Pydantic v2 with modern field validators and model configuration.
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from pydantic import ConfigDict
 
 
@@ -190,6 +190,7 @@ class OTPCreate(OTPBase):
     """Schema for OTP creation."""
 
     user_id: int = Field(..., description="User ID")
+    code: str = Field(..., min_length=4, max_length=10, description="OTP code")
 
 
 class OTPVerify(BaseModel):

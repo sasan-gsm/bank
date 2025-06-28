@@ -4,7 +4,7 @@ Implements the database schema with relationships and custom permissions.
 """
 
 from typing import List, Optional
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table
 from sqlalchemy.orm import relationship, Mapped
 from app.db.base import BaseModel
 
