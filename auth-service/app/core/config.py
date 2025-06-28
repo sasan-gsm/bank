@@ -1,87 +1,85 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+import os
+from typing import Optional, List
+from pydantic import BaseSettings, Field, EmailStr
 from functools import lru_cache
-import json
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables"""
+    """Application settings with environment-specific configuration."""
 
-    # API Configuration
-    API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "Bank Auth Service"
-    PROJECT_VERSION: str = "1.0.0"
-    DEBUG: bool = False
-    ENVIRONMENT: str = "production"
-
-    # CORS Configuration
-    BACKEND_CORS_ORIGINS: List[str] = [
-        "http://localhost",
-        "http://localhost:4200",
-        "http://localhost:3000",
-        "http://localhost:8080",
-    ]
+    # Environment Configuration
+    environment: str = Field(default="development")
+    debug: bool = Field(default=True)
 
     # Database Configuration
-    DATABASE_URL: str = "sqlite+aiosqlite:///./data/auth.db"
-    DATABASE_ECHO: bool = False
+    database_url: str = Field(default="sqlite+aiosqlite:///./auth.db")
 
-    # JWT Security
-    JWT_SECRET_KEY: str = "your-super-secret-jwt-key-change-this-in-production"
-    JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # JWT Configuration
+    jwt_private_key: str
+    jwt_public_key: str
+    jwt_algorithm: str = Field(default="RS256")
+    access_token_expire_minutes: int = Field(default=30)
+    refresh_token_expire_days: int = Field(default=7)
 
-    # Password Hashing
-    PASSWORD_HASH_ALGORITHM: str = "argon2"
-    ARGON2_TIME_COST: int = 2
-    ARGON2_MEMORY_COST: int = 65536
-    ARGON2_PARALLELISM: int = 1
+    # Redis Configuration
+    redis_host: str = Field(default="localhost")
+    redis_port: int = Field(default=6379)
+    redis_db: int = Field(default=0)
+    redis_password: Optional[str] = None
 
-    # RabbitMQ Configuration
-    RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672/"
-    RABBITMQ_EXCHANGE: str = "auth_exchange"
-    RABBITMQ_QUEUE: str = "auth_queue"
-    RABBITMQ_ROUTING_KEY: str = "auth.events"
+    # Cache Configuration
+    cache_ttl: int = Field(default=300)  # 5 minutes
+    cache_prefix: str = Field(default="auth-service")
 
-    # Logging Configuration
-    LOG_LEVEL: str = "INFO"
-    LOG_FORMAT: str = "{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
-    LOG_FILE: str = "logs/auth_service.log"
-    LOG_ROTATION: str = "10 MB"
-    LOG_RETENTION: str = "30 days"
+    # Email Configuration
+    smtp_host: str = Field(default="localhost")
+    smtp_port: int = Field(default=587)
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_use_tls: bool = Field(default=True)
 
-    # Persian Calendar
-    USE_JALALI_CALENDAR: bool = True
+    # OTP Configuration
+    otp_length: int = Field(default=6)
+    otp_expire_minutes: int = Field(default=10)
 
-    # Default Superuser
-    FIRST_SUPERUSER_EMAIL: str = "sasan.gsm@gmail.com"
-    FIRST_SUPERUSER_USERNAME: str = "sassan"
-    FIRST_SUPERUSER_PASSWORD: str = "QAZ123"
-    FIRST_SUPERUSER_FULL_NAME: str = "System Administrator"
+    # First Superuser Configuration
+    first_superuser_username: str = Field(default="admin")
+    first_superuser_email: EmailStr = Field(default="admin@example.com")
+    first_superuser_password: str = Field(default="admin123")
+    first_superuser_full_name: str = Field(default="System Administrator")
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="ignore"
+    # Inter-service Communication
+    transaction_service_url: str = Field(default="http://localhost:8001")
+    account_service_url: str = Field(default="http://localhost:8002")
+    notification_service_url: str = Field(default="http://localhost:8003")
+
+    # Celery Configuration
+    celery_broker_url: str = Field(default="redis://localhost:6379/1")
+    celery_result_backend: str = Field(default="redis://localhost:6379/2")
+
+    # CORS Configuration
+    allowed_origins: List[str] = Field(
+        default=["http://localhost:3000", "http://localhost:8080"]
     )
 
-    def _parse_cors_origins(self, v):
-        """Parse CORS origins from string or list"""
-        if isinstance(v, str):
-            try:
-                return json.loads(v)
-            except json.JSONDecodeError:
-                return [origin.strip() for origin in v.split(",")]
-        return v
+    class Config:
+        # Automatically switch between .env and .env.production
+        env_file = ".env.production" if os.getenv("ENV") == "production" else ".env"
+        case_sensitive = False
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.BACKEND_CORS_ORIGINS = self._parse_cors_origins(self.BACKEND_CORS_ORIGINS)
+    @property
+    def redis_url(self) -> str:
+        """Construct Redis URL from components."""
+        if self.redis_password:
+            return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Get cached settings instance"""
+    """Returns a cached instance of the Settings."""
     return Settings()
 
 
-# Create settings instance for backward compatibility
+# Usage: import `settings` wherever you need config access
 settings = get_settings()
