@@ -1,5 +1,6 @@
 # app/core/config.py
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional
 from functools import lru_cache
 
@@ -42,9 +43,7 @@ class Settings(BaseSettings):
     LOG_ROTATION: str = Field("10 MB")
     LOG_RETENTION: str = Field("30 days")
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
     @property
     def redis_url(self) -> str:
@@ -58,5 +57,5 @@ def get_settings() -> Settings:
     return Settings()
 
 
-# Create settings instance for backward compatibility
+# Create settings instance
 settings = get_settings()
