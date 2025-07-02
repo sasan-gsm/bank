@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, EmailStr
 from functools import lru_cache
 from decouple import config
-from typing import Optional
+from typing import Optional, List
 
 
 class Settings(BaseSettings):
