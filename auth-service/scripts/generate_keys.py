@@ -162,8 +162,12 @@ def main() -> None:
         logger.info("\nNext steps:")
         logger.info("1. Add the keys directory to .gitignore")
         logger.info("2. Set environment variables:")
-        logger.info(f"   - JWT_PRIVATE_KEY=<content of {args.output_dir}/private_key.pem>")
-        logger.info(f"   - JWT_PUBLIC_KEY=<content of {args.output_dir}/public_key.pem>")
+        logger.info(
+            f"   - JWT_PRIVATE_KEY=<content of {args.output_dir}/private_key.pem>"
+        )
+        logger.info(
+            f"   - JWT_PUBLIC_KEY=<content of {args.output_dir}/public_key.pem>"
+        )
         if os.name != "nt":
             logger.info("3. Verify private key permissions are set to 600")
         logger.info("=" * 50)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Database initialization script for auth-service.
+"""
+Database initialization script for auth-service.
 
-This script creates the database tables, seeds default roles and permissions,
-and creates an initial admin user.
+Creates tables, seeds default permissions and roles, and sets up initial admin user.
 """
 
 import asyncio
