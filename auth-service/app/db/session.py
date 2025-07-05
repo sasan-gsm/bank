@@ -1,32 +1,37 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import registry
-from sqlalchemy import Column, Integer, DateTime, Boolean
-from sqlalchemy.sql import func
-from sqlalchemy import event
-from ..core.config import settings
-from typing import AsyncGenerator
+"""
+Database session management with SQLite WAL mode optimization.
+Provides async session factory and connection management.
+"""
 
-mapper_registry = registry()
-Base = mapper_registry.generate_base()
+from typing import AsyncGenerator
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import event
+from app.core.config import settings
+from .base import Base
+from contextlib import asynccontextmanager
 
 
 class DatabaseManager:
-    def __init__(self) -> None:
+    """Database manager with connection pooling and session management."""
+
+    def __init__(self):
+        """Initialize database manager with async engine."""
         self.engine = create_async_engine(
-            url=settings.database_url,
+            settings.database_url,
             echo=settings.debug,
             future=True,
             connect_args={"check_same_thread": False}
             if "sqlite" in settings.database_url
             else {},
         )
-        # Enable SQLite
+
+        # Enable SQLite WAL mode for better concurrent write performance
         if "sqlite" in settings.database_url:
 
             @event.listens_for(self.engine.sync_engine, "connect")
-            def set_sqlite_pragma(db_api, connection_record):
+            def set_sqlite_pragma(dbapi_connection, connection_record):
                 """Set SQLite pragmas for optimal performance."""
-                cursor = db_api.cursor()
+                cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA journal_mode=WAL")
                 cursor.execute("PRAGMA synchronous=NORMAL")
                 cursor.execute("PRAGMA cache_size=1000")
@@ -43,7 +48,14 @@ class DatabaseManager:
             autocommit=False,
         )
 
+    @asynccontextmanager
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
+        """
+        Get database session with proper lifecycle management.
+
+        Yields:
+            AsyncSession: Database session
+        """
         async with self.async_session_factory() as session:
             try:
                 yield session
@@ -64,6 +76,7 @@ class DatabaseManager:
             await conn.run_sync(Base.metadata.drop_all)
 
 
+# Global database manager instance
 db_manager = DatabaseManager()
 
 
