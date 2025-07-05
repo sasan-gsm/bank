@@ -5,6 +5,7 @@ Provides foundation for all database models.
 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, DateTime, Boolean
+from sqlalchemy.orm import registry
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, registry
 from datetime import datetime
