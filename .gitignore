@@ -1,5 +1,6 @@
 ### Python ###
 venv
+keys
 .vscode
 .idea
 staticfiles/
@@ -177,4 +178,6 @@ poetry.toml
 
 # LSP config files
 pyrightconfig.json
-
+*.db
+auth.db-shm
+auth.db-wal
