@@ -1,8 +1,9 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator, EmailStr
+# auth-service/app/core/config.py
+from typing import List, Optional, Union
 from functools import lru_cache
+from pydantic import EmailStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from decouple import config
-from typing import Optional, List
 
 
 class Settings(BaseSettings):
@@ -19,8 +20,12 @@ class Settings(BaseSettings):
     database_url: str = config("DATABASE_URL", default="sqlite+aiosqlite:///./auth.db")
 
     # JWT Configuration (RS256 Enterprise Standard)
-    jwt_private_key: str = config("JWT_PRIVATE_KEY")
-    jwt_public_key: str = config("JWT_PUBLIC_KEY")
+    jwt_private_key_path: str = config(
+        "JWT_PRIVATE_KEY_PATH", default="keys/private_key.pem"
+    )
+    jwt_public_key_path: str = config(
+        "JWT_PUBLIC_KEY_PATH", default="keys/public_key.pem"
+    )
     jwt_algorithm: str = config("JWT_ALGORITHM", default="RS256")
     access_token_expire_minutes: int = config(
         "ACCESS_TOKEN_EXPIRE_MINUTES", default=30, cast=int
@@ -51,16 +56,10 @@ class Settings(BaseSettings):
     otp_expire_minutes: int = config("OTP_EXPIRE_MINUTES", default=10, cast=int)
 
     # First Superuser Configuration
-    first_superuser_username: str = config("FIRST_SUPERUSER_USERNAME", default="admin")
-    first_superuser_email: EmailStr = config(
-        "FIRST_SUPERUSER_EMAIL", default="admin@example.com"
-    )
-    first_superuser_password: str = config(
-        "FIRST_SUPERUSER_PASSWORD", default="admin123"
-    )
-    first_superuser_full_name: str = config(
-        "FIRST_SUPERUSER_FULL_NAME", default="System Administrator"
-    )
+    admin_username: str = config("ADMIN_USERNAME", default="sassan")
+    admin_email: EmailStr = config("ADMIN_EMAIL", default="sasanmehr@gmail.com")
+    admin_password: str = config("ADMIN_PASSWORD", default="@123")
+    admin_full_name: str = config("ADMIN_FULL_NAME", default="SysAdmin")
 
     # Inter-service Communication URLs
     transaction_service_url: str = config(
@@ -88,16 +87,22 @@ class Settings(BaseSettings):
     )
 
     # CORS Configuration
-    allowed_origins: List[str] = config(
-        "ALLOWED_ORIGINS",
-        default="http://localhost:3000,http://localhost:8080",
-        cast=lambda v: [s.strip() for s in v.split(",")],
-    )
+    allowed_origins: List[str] = ["http://localhost:3000", "http://localhost:8080"]
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            # Handle comma-separated string from .env
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        elif isinstance(v, list):
+            return v
+        return ["http://localhost:3000", "http://localhost:8080"]
 
     @field_validator("environment")
     @classmethod
     def validate_environment(cls, v: str) -> str:
-        allowed = ["development", "testing", "staging", "production"]
+        allowed = ["development", "staging", "production"]
         if v.lower() not in allowed:
             raise ValueError(f"Environment must be one of: {allowed}")
         return v.lower()
@@ -118,9 +123,10 @@ class Settings(BaseSettings):
     )
 
 
-@lru_cache
+@lru_cache()
 def get_settings() -> Settings:
+    """Get cached settings instance"""
     return Settings()
 
 
-settings = Settings()
+settings = get_settings()
