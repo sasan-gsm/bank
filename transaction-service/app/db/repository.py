@@ -18,7 +18,8 @@ from app.core.exceptions import (
     InsufficientBalanceError,
     InvalidTransactionError,
 )
-from datetime import date
+from app.domain.enums import TransactionStatus
+from datetime import date, datetime
 import uuid
 
 
@@ -64,9 +65,11 @@ class AccountRepository:
     ) -> Account:
         if not credit and account.current_balance < amount:
             raise InsufficientBalanceError("Not enough funds")
+
         delta = amount if credit else -amount
         account.current_balance += delta
         account.available_balance += delta
+
         await self.session.commit()
         await cache_manager.invalidate_account(account.id)
         return account
@@ -76,34 +79,67 @@ class TransactionRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get(self, txn_id: int) -> Transaction:
-        tx = (
-            await self.session.execute(
-                select(Transaction)
-                .options(selectinload(Transaction.account))
-                .where(and_(Transaction.id == txn_id, Transaction.is_deleted == False))
+    async def get(self, txn_id: int) -> Optional[Transaction]:
+        """Get transaction by database ID"""
+        result = await self.session.execute(
+            select(Transaction)
+            .options(selectinload(Transaction.account))
+            .where(and_(Transaction.id == txn_id, Transaction.is_deleted == False))
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_transaction_id(self, transaction_id: str) -> Optional[Transaction]:
+        """Get transaction by transaction_id string"""
+        result = await self.session.execute(
+            select(Transaction)
+            .options(selectinload(Transaction.account))
+            .where(
+                and_(
+                    Transaction.transaction_id == transaction_id,
+                    Transaction.is_deleted == False,
+                )
             )
-        ).scalar_one_or_none()
-        if not tx:
-            raise NotFoundError("Transaction not found")
-        return tx
+        )
+        return result.scalar_one_or_none()
 
     async def create(self, payload: TransactionCreate, user_id: int) -> Transaction:
         if payload.amount <= 0:
             raise InvalidTransactionError("Amount must be positive")
+
         tx = Transaction(
             transaction_id=f"TXN-{uuid.uuid4().hex[:12].upper()}",
             **payload.model_dump(exclude={"id"}),
             created_by_user_id=user_id,
+            status=TransactionStatus.PENDING,  # Default status
         )
+
         self.session.add(tx)
         await self.session.commit()
         await self.session.refresh(tx)
         return tx
 
-    async def update(self, tx: Transaction, payload: TransactionUpdate):
+    async def update(self, tx: Transaction, payload: TransactionUpdate) -> Transaction:
         for k, v in payload.model_dump(exclude_unset=True).items():
             setattr(tx, k, v)
+
+        await self.session.commit()
+        await self.session.refresh(tx)
+        return tx
+
+    async def verify_transaction(self, tx: Transaction, user_id: int) -> Transaction:
+        """Verify a transaction"""
+        tx.status = TransactionStatus.VERIFIED
+        tx.verified_by_user_id = user_id
+        tx.processed_date = datetime.utcnow()
+
+        await self.session.commit()
+        await self.session.refresh(tx)
+        return tx
+
+    async def void_transaction(self, tx: Transaction) -> Transaction:
+        """Void a transaction"""
+        tx.status = TransactionStatus.VOIDED
+
         await self.session.commit()
         await self.session.refresh(tx)
         return tx
@@ -117,6 +153,12 @@ class TransactionRepository:
         q = q.offset(skip).limit(limit).order_by(desc(Transaction.transaction_date))
         return (await self.session.execute(q)).scalars().all()
 
+    async def list_all(self, skip=0, limit=100) -> List[Transaction]:
+        """List all transactions"""
+        q = select(Transaction).where(Transaction.is_deleted == False)
+        q = q.offset(skip).limit(limit).order_by(desc(Transaction.transaction_date))
+        return (await self.session.execute(q)).scalars().all()
+
 
 class FutureTransactionRepository:
     def __init__(self, session: AsyncSession):
@@ -124,11 +166,27 @@ class FutureTransactionRepository:
 
     async def get_due(self, target_date: date) -> List[FutureTransaction]:
         q = select(FutureTransaction).filter(
-            FutureTransaction.due_date == target_date,
-            FutureTransaction.status == FutureTransaction.SCHEDULED,
+            FutureTransaction.due_date <= target_date,
+            FutureTransaction.status == "PENDING",  # Use string status
             FutureTransaction.is_deleted == False,
         )
         return (await self.session.execute(q)).scalars().all()
+
+    async def get_by_transaction_id(
+        self, transaction_id: str
+    ) -> Optional[FutureTransaction]:
+        """Get future transaction by transaction_id string"""
+        result = await self.session.execute(
+            select(FutureTransaction)
+            .options(selectinload(FutureTransaction.account))
+            .where(
+                and_(
+                    FutureTransaction.transaction_id == transaction_id,
+                    FutureTransaction.is_deleted == False,
+                )
+            )
+        )
+        return result.scalar_one_or_none()
 
     async def create(
         self, payload: FutureTransactionCreate, user_id: int
@@ -139,6 +197,7 @@ class FutureTransactionRepository:
                 exclude={"id", "notification_days", "notification_users"}
             ),
             created_by_user_id=user_id,
+            status="PENDING",  # Default status
             notification_days=",".join(map(str, payload.notification_days))
             if payload.notification_days
             else None,
@@ -146,7 +205,30 @@ class FutureTransactionRepository:
             if payload.notification_users
             else None,
         )
+
         self.session.add(ft)
         await self.session.commit()
         await self.session.refresh(ft)
         return ft
+
+    async def update(self, ft: FutureTransaction, payload) -> FutureTransaction:
+        """Update future transaction"""
+        for k, v in payload.model_dump(exclude_unset=True).items():
+            setattr(ft, k, v)
+
+        await self.session.commit()
+        await self.session.refresh(ft)
+        return ft
+
+    async def list_by_account(
+        self, account_id: int, skip=0, limit=100
+    ) -> List[FutureTransaction]:
+        """List future transactions for an account"""
+        q = select(FutureTransaction).where(
+            and_(
+                FutureTransaction.account_id == account_id,
+                FutureTransaction.is_deleted == False,
+            )
+        )
+        q = q.offset(skip).limit(limit).order_by(desc(FutureTransaction.due_date))
+        return (await self.session.execute(q)).scalars().all()
