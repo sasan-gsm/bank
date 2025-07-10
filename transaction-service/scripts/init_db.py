@@ -2,20 +2,24 @@
 Database initialization and seeding script for transaction service.
 """
 
+from pathlib import Path
+import sys
 import asyncio
 from decimal import Decimal
 from sqlalchemy.future import select
-from ..app.db.session import db_manager
+from app.db.session import db_manager
 from app.domain.models import Account
 import logging
 
 logger = logging.getLogger(__name__)
+# Add the app directory to the Python path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 async def seed_database():
     """Seed database with default accounts and data."""
     try:
-        async with db_manager.session_factory() as session:
+        async with db_manager.async_session_factory() as session:
             # Check if accounts already exist
             result = await session.execute(select(Account))
             existing_accounts = result.scalars().all()
@@ -28,28 +32,24 @@ async def seed_database():
             default_accounts = [
                 {
                     "account_number": "0110071588004",
-                    "account_name": "",
-                    "bank_name": "بانک ملی حافظ",
+                    "bank_name": "بانک ملی شعبه حافظ",
                     "current_balance": Decimal("0.00"),
                     "available_balance": Decimal("0.00"),
                 },
                 {
                     "account_number": "2431104758251",
-                    "account_name": "",
                     "bank_name": "بانک پاسارگاد کاشانی",
                     "current_balance": Decimal("0.00"),
                     "available_balance": Decimal("0.00"),
                 },
                 {
                     "account_number": "00115368811000",
-                    "account_name": "",
-                    "bank_name": "بانک ملی حافظ",
+                    "bank_name": "بانک ملی شعبه حافظ",
                     "current_balance": Decimal("0.00"),
                     "available_balance": Decimal("0.00"),
                 },
                 {
                     "account_number": "2438104758251",
-                    "account_name": "",
                     "bank_name": "بانک پاسارگاد کاشانی",
                     "current_balance": Decimal("0.00"),
                     "available_balance": Decimal("0.00"),

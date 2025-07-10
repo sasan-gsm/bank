@@ -3,8 +3,6 @@ Generate test fixtures for transaction service development and testing.
 """
 
 import asyncio
-import os
-import sys
 import random
 from datetime import date, timedelta
 from decimal import Decimal
@@ -19,8 +17,6 @@ from app.domain.enums import (
 )
 import uuid
 import logging
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 logger = logging.getLogger(__name__)
 
