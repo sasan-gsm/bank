@@ -1,0 +1,1 @@
+"""Scripts package for auth-service utilities."""
