@@ -179,5 +179,5 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 *.db
-auth.db-shm
-auth.db-wal
+*.db-shm
+*.db-wal
