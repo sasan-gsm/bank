@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
-
+from fastapi_pagination import add_pagination
 from app.core.config import settings
 from app.core.cache import cache_manager
 from app.db.session import db_manager
@@ -50,6 +50,7 @@ app = FastAPI(
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
 )
+add_pagination(app)
 
 app.add_middleware(
     TrustedHostMiddleware,
@@ -75,7 +76,7 @@ app.include_router(balance.router, prefix="/api/v1/balance")
 @app.get("/health")
 async def health():
     try:
-        async with db_manager.get_session() as session:
+        async with db_manager.async_session_factory() as session:
             await session.execute("SELECT 1")
         if cache_manager.redis_client:
             await cache_manager.redis_client.ping()
