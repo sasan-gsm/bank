@@ -55,9 +55,9 @@ class CacheManager:
 cache_manager = CacheManager()
 
 
-def _mk_cache_decorator(prefix: str, ttl: int):
+def _mk_cache_decorator(namespace: str, ttl: int):
     def decorator(func):
-        return cache(expire=ttl, prefix=prefix)(func)
+        return cache(expire=ttl, namespace=namespace)(func)
 
     return decorator
 
