@@ -1,0 +1,156 @@
+services:
+  # Account Service
+  account-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: account-service
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=sqlite+aiosqlite:///./data/accounts.db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-your-jwt-public-key-here}
+      - JWT_ALGORITHM=RS256
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8000
+      - REDIS_STREAM_ACCOUNTS=account-events
+      - REDIS_STREAM_TRANSACTIONS=transaction-events
+      - CACHE_TTL=300
+      - LOG_LEVEL=INFO
+    volumes:
+      - account_data:/app/data
+      - account_logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - bank_network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8002/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Account Service Worker
+  account-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: account-worker
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=sqlite+aiosqlite:///./data/accounts.db
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_STREAM_ACCOUNTS=account-events
+      - REDIS_STREAM_TRANSACTIONS=transaction-events
+      - LOG_LEVEL=INFO
+    volumes:
+      - account_data:/app/data
+      - account_logs:/app/logs
+    depends_on:
+      - redis
+      - account-service
+    networks:
+      - bank_network
+    restart: unless-stopped
+    command: [ "python", "worker.py" ]
+
+  # Redis for caching and event streaming
+  redis:
+    image: redis:7-alpine
+    container_name: account-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bank_network
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Commander (Redis GUI) - Development only
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: account-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - bank_network
+    profiles:
+      - development
+
+  # Database initialization service
+  db-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: account-db-init
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=sqlite+aiosqlite:///./data/accounts.db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - account_data:/app/data
+    depends_on:
+      - redis
+    networks:
+      - bank_network
+    command: [ "python", "scripts/init_db.py", "init" ]
+    restart: "no"
+
+volumes:
+  account_data:
+    driver: local
+  account_logs:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  bank_network:
+    driver: bridge
+    external: true
+
+# Development override
+# Use: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#---
+# docker-compose.dev.yml content (inline for convenience)
+# version: '3.8'
+#
+# services:
+#   account-service:
+#     build:
+#       target: development
+#     environment:
+#       - ENVIRONMENT=development
+#       - LOG_LEVEL=DEBUG
+#     volumes:
+#       - .:/app
+#     command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+#     profiles:
+#       - development
+#
+#   account-worker:
+#     build:
+#       target: development
+#     environment:
+#       - ENVIRONMENT=development
+#       - LOG_LEVEL=DEBUG
+#     volumes:
+#       - .:/app
+#     profiles:
+#       - development
