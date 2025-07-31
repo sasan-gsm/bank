@@ -1,0 +1,56 @@
+# FastAPI and ASGI server
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+
+# Database and ORM
+sqlalchemy[asyncio]==2.0.41
+aiosqlite==0.20.0
+alembic==1.14.0
+
+# Authentication and Security
+pyjwt[crypto]==2.8.0
+passlib[argon2]==1.7.4
+python-multipart==0.0.9
+cryptography==41.0.8
+
+# Configuration and Environment
+python-decouple==3.8
+
+# Validation and Schemas
+pydantic==2.11.7
+pydantic-settings==2.6.1
+
+# MinIO object storage
+minio==7.2.15
+
+# Redis and Celery for background tasks
+redis[hiredis]==5.2.0
+celery[redis]==5.4.0
+
+# HTTP Client for Inter-service Communication
+httpx==0.28.1
+
+# Image processing (for thumbnails)
+Pillow==10.1.0
+
+# File type detection
+python-magic==0.4.27
+
+# Logging and monitoring
+structlog==23.2.0
+
+# Date and time utilities
+python-dateutil==2.8.2
+
+# JSON handling
+orjson==3.9.10
+
+# Development dependencies
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+
